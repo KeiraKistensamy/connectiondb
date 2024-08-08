@@ -1,8 +1,10 @@
 import express from 'express';
 import path from 'path';
-import { connection as db } from '../../config/index.js';
+import { connection as db } from './config/index.js';
 
-const router = express.Router();
+const router = express.Router()
+const app = express()
+const port = process.env.PORT || 9000
 
 // Middleware
 app.use(router, 
