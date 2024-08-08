@@ -10,8 +10,8 @@ let connection = createPool ({
     connectionLimit: 30
 })
 
-connection.on('connection', (err) => {
-    if (err) throw new Error('Can not connect to database right now ')
+connection.on('connection', (pool) => {
+    if (!pool) throw new Error('Can not connect to database right now ')
 })
 
 export {

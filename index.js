@@ -1,140 +1,267 @@
-// importing
+import express from 'express';
+import path from 'path';
+import { connection as db } from '../../config/index.js';
 
-import express from 'express'
-import path from 'path'
-import { connection } from './config/index.js'
-
-// Creating an express app
-
-const app = express()
-const port = +process.env.PORT || 4000
-const router = express.Router()
+const router = express.Router();
 
 // Middleware
+app.use(router, 
+    express.static('./static'),
+    express.json(),
+    express.urlencoded({ 
+        extended: true 
+    }))
 
-app.use(router, express.static('./static'))
-
-// Endpoints
-
+// Endpoint
 router.get('^/$|/eShop', (req, res) => {
-    res.status(200).sendFile(path.resolve('./static/html/index.html'))
-})
-
-router.get('/users', (req, res) => {
-    try{
-        const strQry = `
-        SELECT firstName, lastName, age, emailAdd
-        FROM Users;
-        `
-        db.query(strQry, (err, results) => {
-            //'Not able to fetch all users'
-            if (err) throw new Error(err)
-                res.json({
-                    status: res.statusCode,
-                    results
-                })
-        })
-    } catch(e) {
-        res.json({
-            status: 404,
-            msg: e.message
-        })
-    }
-})
-
-// Endpoint to serve index.html
-app.get('/', (req, res) => {
-  res.sendFile(__dirname + '/index.html');
+    res.status(200).sendFile(path.resolve('./static/html/index.html'));
 });
 
 // Display all users
-app.get('/users', (req, res) => {
-  res.json(users);
+router.get('/users', (req, res) => {
+    try {
+        const strQry = `
+        SELECT userID, userName, userSurname, userAge, userEmail
+        FROM Users;
+        `;
+        db.query(strQry, (err, results) => {
+            if (err) throw new Error('Not able to fetch all users');
+            res.json({
+                status: res.statusCode,
+                results
+            });
+        });
+    } catch (e) {
+        res.status(404).json({
+            msg: e.message
+        });
+    }
 });
 
-// Display a user based on the primary key
-app.get('/user/:id', (req, res) => {
-  const user = users.find(u => u.id === parseInt(req.params.id));
-  if (user) {
-    res.json(user);
-  } else {
-    res.status(404).send('User not found');
-  }
+// Display a user based on the pk
+router.get('/user/:id', (req, res) => {
+    try {
+        const strQry = `
+        SELECT userID, userName, userSurname, userAge, userEmail
+        FROM Users
+        WHERE userID = ${req.params.id};
+        `;
+        db.query(strQry, [req.params.id], (err, results) => {
+            if (err) throw new Error('Not able to fetch the user');
+            if (results.length === 0) {
+                res.status(404).send('User not found');
+            } else {
+                res.json({
+                    status: res.statusCode,
+                    results
+                });
+            }
+        });
+    } catch (e) {
+        res.status(404).json({
+            msg: e.message
+        });
+    }
 });
 
 // Add a user to the database
-app.post('/register', (req, res) => {
-  const newUser = { id: userId++, ...req.body };
-  users.push(newUser);
-  res.status(201).json(newUser);
+router.post('/register', (req, res) => {
+    try {
+        const { userName, userSurname, userAge, userEmail, userPwd } = req.body;
+        const strQry = `
+        INSERT INTO Users (userName, userSurname, userAge, userEmail, userPwd)
+        VALUES (?, ?, ?, ?, ?);
+        `;
+        db.query(strQry, [userName, userSurname, userAge, userEmail, userPwd], (err, results) => {
+            if (err) throw new Error('Not able to register the user');
+            res.status(201).json({
+                userID: results.insertId,
+                userName,
+                userSurname,
+                userAge,
+                userEmail
+            });
+        });
+    } catch (e) {
+        res.status(500).json({
+            msg: e.message
+        });
+    }
 });
 
 // Update a user
-app.patch('/user/:id', (req, res) => {
-  const user = users.find(u => u.id === parseInt(req.params.id));
-  if (user) {
-    Object.assign(user, req.body);
-    res.json(user);
-  } else {
-    res.status(404).send('User not found');
-  }
+router.patch('/user/:id', (req, res) => {
+    try {
+        const strQry = `
+        UPDATE Users
+        SET ?
+        WHERE userID = ?;
+        `;
+        db.query(strQry, [req.body, req.params.id], (err, results) => {
+            if (err) throw new Error('Not able to update the user');
+            if (results.affectedRows === 0) {
+                res.status(404).send('User not found');
+            } else {
+                res.json({
+                    message: 'User updated'
+                });
+            }
+        });
+    } catch (e) {
+        res.status(500).json({
+            msg: e.message
+        });
+    }
 });
 
-// Delete a specific user
-app.delete('/user/:id', (req, res) => {
-  const userIndex = users.findIndex(u => u.id === parseInt(req.params.id));
-  if (userIndex > -1) {
-    users.splice(userIndex, 1);
-    res.status(204).send();
-  } else {
-    res.status(404).send('User not found');
-  }
+// Delete a user
+router.delete('/user/:id', (req, res) => {
+    try {
+        const strQry = `
+        DELETE FROM Users
+        WHERE userID = ${req.params.id};
+        `;
+        db.query(strQry, [req.params.id], (err, results) => {
+            if (err) throw new Error('Not able to delete the user');
+            if (results.affectedRows === 0) {
+                res.status(404).send('User not found');
+            } else {
+                res.status(204).send();
+            }
+        });
+    } catch (e) {
+        res.status(500).json({
+            msg: e.message
+        });
+    }
 });
 
-// Display all products
-app.get('/products', (req, res) => {
-  res.json(products);
+// Display products
+router.get('/products', (req, res) => {
+    try {
+        const strQry = `
+        SELECT prodID, prodName, prodQuantity, prodPrice, prodURL, userID
+        FROM Products;
+        `;
+        db.query(strQry, (err, results) => {
+            if (err) throw new Error('Not able to fetch all products');
+            res.json({
+                status: res.statusCode,
+                results
+            });
+        });
+    } catch (e) {
+        res.status(404).json({
+            msg: e.message
+        });
+    }
 });
 
 // Display a product based on the primary key
-app.get('/product/:id', (req, res) => {
-  const product = products.find(p => p.id === parseInt(req.params.id));
-  if (product) {
-    res.json(product);
-  } else {
-    res.status(404).send('Product not found');
-  }
+router.get('/product/:id', (req, res) => {
+    try {
+        const strQry = `
+        SELECT prodID, prodName, prodQuantity, prodPrice, prodURL, userID
+        FROM Products
+        WHERE prodID = ${req.params.id};
+        `;
+        db.query(strQry, [req.params.id], (err, results) => {
+            if (err) throw new Error('Not able to fetch the product');
+            if (results.length === 0) {
+                res.status(404).send('Product not found');
+            } else {
+                res.json({
+                    status: res.statusCode,
+                    results
+                });
+            }
+        });
+    } catch (e) {
+        res.status(404).json({
+            msg: e.message
+        });
+    }
 });
 
 // Add a product to the database
-app.post('/addProduct', (req, res) => {
-  const newProduct = { id: productId++, ...req.body };
-  products.push(newProduct);
-  res.status(201).json(newProduct);
+router.post('/addProduct', (req, res) => {
+    try {
+        const { prodName, prodQuantity, prodPrice, prodURL, userID } = req.body;
+        const strQry = `
+        INSERT INTO Products (prodName, prodQuantity, prodPrice, prodURL, userID)
+        VALUES (?, ?, ?, ?, ?);
+        `;
+        db.query(strQry, [prodName, prodQuantity, prodPrice, prodURL, userID], (err, results) => {
+            if (err) throw new Error('Not able to add the product');
+            res.status(201).json({
+                prodID: results.insertId,
+                prodName,
+                prodQuantity,
+                prodPrice,
+                prodURL,
+                userID
+            });
+        });
+    } catch (e) {
+        res.status(500).json({
+            msg: e.message
+        });
+    }
 });
 
 // Update a product
-app.patch('/product/:id', (req, res) => {
-  const product = products.find(p => p.id === parseInt(req.params.id));
-  if (product) {
-    Object.assign(product, req.body);
-    res.json(product);
-  } else {
-    res.status(404).send('Product not found');
-  }
+router.patch('/product/:id', (req, res) => {
+    try {
+        const strQry = `
+        UPDATE Products
+        SET ?
+        WHERE prodID = ?;
+        `;
+        db.query(strQry, [req.body, req.params.id], (err, results) => {
+            if (err) throw new Error('Not able to update the product');
+            if (results.affectedRows === 0) {
+                res.status(404).send('Product not found');
+            } else {
+                res.json({
+                    message: 'Product updated'
+                });
+            }
+        });
+    } catch (e) {
+        res.status(500).json({
+            msg: e.message
+        });
+    }
 });
 
 // Delete a specific product
-app.delete('/product/:id', (req, res) => {
-  const productIndex = products.findIndex(p => p.id === parseInt(req.params.id));
-  if (productIndex > -1) {
-    products.splice(productIndex, 1);
-    res.status(204).send();
-  } else {
-    res.status(404).send('Product not found');
-  }
+router.delete('/product/:id', (req, res) => {
+    try {
+        const strQry = `
+        DELETE FROM Products
+        WHERE prodID = ?;
+        `;
+        db.query(strQry, [req.params.id], (err, results) => {
+            if (err) throw new Error('Not able to delete the product');
+            if (results.affectedRows === 0) {
+                res.status(404).send('Product not found');
+            } else {
+                res.status(204).send();
+            }
+        });
+    } catch (e) {
+        res.status(500).json({
+            msg: e.message
+        });
+    }
 });
 
-app.listen(port, () => {
-  console.log(`Server running at http://localhost:${port}/`);
-});
+router.get('*', (req, res) => {
+    res.json({
+        status: 404,
+        msg: 'Route not found'
+    })
+})
+app.listen(port, () =>{
+    console.log(`Server is running on ${port}`);
+})
